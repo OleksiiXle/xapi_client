@@ -15,8 +15,43 @@ return [
         'request' => [
             'csrfParam' => '_csrf-frontend',
         ],
+        'configs' => [
+            'class' => 'common\components\ConfigsComponent',
+        ],
+        'authClientCollection' => [
+            'class'   => 'yii\authclient\Collection',
+            'clients' => [
+                'xapi' => [
+                    'class'        => 'frontend\components\XapiAuthClient',
+                    'clientId'     => 'xapi',
+                    'clientSecret' => '123',
+                    'tokenUrl'     => 'http://api.server/oauth2/auth/token',
+                    'authUrl'      => 'http://api.server/oauth2/auth/index',
+                   // 'authUrl'      => 'http://api.server/oauth2/index?expand=email',
+                    'apiBaseUrl'   => 'http://api.server/v1',
+                    /*
+                    'clientId'     => $params['clientId'],
+                    'clientSecret' => $params['clientSecret'],
+                    'tokenUrl'     => $params['tokenUrl'],
+                    'authUrl'      => $params['authUrl'],
+                    'apiBaseUrl'   => $params['apiBaseUrl'],
+                    */
+                    'stateStorage' => 'frontend\components\XapiStateStorage'
+                ],
+            ],
+        ],
+        'xapi'  => [
+            'class'      => 'frontend\components\XapiV1Client',
+            'apiBaseUrl' => $params['apiBaseUrl'],
+        ],
+        'authManager' => [
+            'class' => 'backend\modules\adminx\components\DbManager',
+            'cache' => 'cache'
+        ],
         'user' => [
-            'identityClass' => 'common\models\User',
+            'class' => 'frontend\components\UserX',
+            'identityClass' => 'frontend\models\User',
+            'loginUrl' => ['site/login'],
             'enableAutoLogin' => true,
             'identityCookie' => ['name' => '_identity-frontend', 'httpOnly' => true],
         ],
@@ -36,14 +71,12 @@ return [
         'errorHandler' => [
             'errorAction' => 'site/error',
         ],
-        /*
         'urlManager' => [
             'enablePrettyUrl' => true,
             'showScriptName' => false,
             'rules' => [
             ],
         ],
-        */
     ],
     'params' => $params,
 ];

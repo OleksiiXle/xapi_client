@@ -1,10 +1,12 @@
 <?php
 namespace frontend\controllers;
 
+use frontend\models\Auth;
 use frontend\models\ResendVerificationEmailForm;
 use frontend\models\VerifyEmailForm;
 use Yii;
 use yii\base\InvalidArgumentException;
+use yii\httpclient\Client;
 use yii\web\BadRequestHttpException;
 use yii\web\Controller;
 use yii\filters\VerbFilter;
@@ -20,6 +22,7 @@ use frontend\models\ContactForm;
  */
 class SiteController extends Controller
 {
+    public $layout = '@app/views/layouts/xLayout.php';
     /**
      * {@inheritdoc}
      */
@@ -64,6 +67,10 @@ class SiteController extends Controller
                 'class' => 'yii\captcha\CaptchaAction',
                 'fixedVerifyCode' => YII_ENV_TEST ? 'testme' : null,
             ],
+            'auth' => [
+                'class' => 'yii\authclient\AuthAction',
+                'successCallback' => [$this, 'onAuthSuccess'],
+            ],
         ];
     }
 
@@ -77,12 +84,200 @@ class SiteController extends Controller
         return $this->render('index');
     }
 
+
+
+
+    public function onAuthSuccess($client)
+    {
+        $attributes = $client->getUserAttributes();
+
+        /* @var $auth Auth */
+        $auth = Auth::find()->where([
+            'source' => $client->getId(),
+            'source_id' => $attributes['id'],
+        ])->one();
+
+        if (Yii::$app->user->isGuest) {
+            if ($auth) { // авторизация
+                $user = $auth->user;
+                Yii::$app->user->login($user);
+            } else { // регистрация
+                if (isset($attributes['email']) && User::find()->where(['email' => $attributes['email']])->exists()) {
+                    Yii::$app->getSession()->setFlash('error', [
+                        Yii::t('app', "Пользователь с такой электронной почтой как в {client} уже существует, но с ним не связан. Для начала войдите на сайт использую электронную почту, для того, что бы связать её.", ['client' => $client->getTitle()]),
+                    ]);
+                } else {
+                    $password = Yii::$app->security->generateRandomString(6);
+                    $user = new User([
+                        'username' => $attributes['login'],
+                        'email' => $attributes['email'],
+                        'password' => $password,
+                    ]);
+                    $user->generateAuthKey();
+                    $user->generatePasswordResetToken();
+                    $transaction = $user->getDb()->beginTransaction();
+                    if ($user->save()) {
+                        $auth = new Auth([
+                            'user_id' => $user->id,
+                            'source' => $client->getId(),
+                            'source_id' => (string)$attributes['id'],
+                        ]);
+                        if ($auth->save()) {
+                            $transaction->commit();
+                            Yii::$app->user->login($user);
+                        } else {
+                            print_r($auth->getErrors());
+                        }
+                    } else {
+                        print_r($user->getErrors());
+                    }
+                }
+            }
+        } else { // Пользователь уже зарегистрирован
+            if (!$auth) { // добавляем внешний сервис аутентификации
+                $auth = new Auth([
+                    'user_id' => Yii::$app->user->id,
+                    'source' => $client->getId(),
+                    'source_id' => $attributes['id'],
+                ]);
+                $auth->save();
+            }
+        }
+    }
+
+
+
+
     /**
      * Logs in a user.
      *
      * @return mixed
      */
     public function actionLogin()
+    {
+        if (!Yii::$app->user->isGuest) {
+            return $this->goHome();
+        }
+
+        $model = new \frontend\models\LoginForm();
+        if ($model->load(Yii::$app->request->post()) && $model->clientLogin()) {
+            return $this->goBack();
+        } else {
+            $model->password = '';
+
+            return $this->render('login', [
+                'model' => $model,
+            ]);
+        }
+
+
+        $loginForm = new \frontend\models\LoginForm();
+
+        if ($loginForm->load(Yii::$app->request->post()) && $loginForm->validate()) {
+            /* @var $client \yii\authclient\OAuth2 */
+            $client = Yii::$app->authClientCollection->getClient('xapi');
+
+            try {
+                $url = $client->buildAuthUrl();
+                $httpClient = new Client();
+                $request = $httpClient->createRequest()
+                    ->setMethod('GET')
+                    ->setOptions([
+                        'maxRedirects' => 0,
+                    ])
+                    ->setUrl($client->buildAuthUrl());
+                $response = $request->send();
+
+                if (200 == $response->headers['http-code']){
+                    $document = \phpQuery::newDocumentHTML($response->content);
+                  //  $action = $document->find('#login-form')->attr('action');
+                  //  $action = str_replace('/oauth2/index?expand=email', $action, $client->authUrl);
+                    $_csrf = $document->find('input[type=hidden]')->attr('value');
+                    $cookies = $response->cookies;
+                    foreach ($cookies as $key => $cookie) {
+                        $cookies[$key]->value = urlencode($cookies[$key]->value);
+                    }
+                    $loginRequest = $httpClient->createRequest()
+                        ->setMethod('POST')
+                        ->setCookies($cookies)
+                        ->setOptions([
+                            'maxRedirects' => 0,
+                        ])
+                        ->setData([
+                            '_csrf-frontend' => $_csrf,
+                            'LoginForm' => [
+                                'username' => $loginForm->username,
+                                'password' => $loginForm->password,
+                            ]
+                        ])
+                        ->setUrl($client->buildAuthUrl())
+                        ->send();
+
+                    if (200 == $loginRequest->headers['http-code'] || 302 == $loginRequest->headers['http-code']) {
+                        if (isset($loginRequest->headers['location'])) {
+
+                            $location = parse_url($loginRequest->headers['location']);
+                            $params = [];
+                            parse_str($location['query'], $params);
+
+                            // get user data and connect it if need
+                            $_REQUEST['state'] = $params['state'];
+                            $_GET['state'] = $params['state'];
+                            $code = $params['code'];
+                            $token = $client->fetchAccessToken($code);
+                            $t=Yii::$app->authClientCollection;
+                            $r=1;
+
+
+
+
+                        } else {
+                            $loginForm->addError('username', 'Неверная комбинация email и пароля!');
+                            return $this->render('login', [
+                                'model' => $loginForm,
+                            ]);
+                        }
+                    }
+                }
+
+
+
+               // Yii::$app->getResponse()->redirect($url);
+             //   $code = $_GET['code'];
+            //    $accessToken = $client->fetchAccessToken($code);
+
+
+                // аутентификация напрямую через имя пользователя и пароль:
+              //  $accessToken = $client->authenticateUser($loginForm->username, $loginForm->password);
+            } catch (\Exception $e) {
+                // аутентификация завершилась неудачей, используйте `$e->getMessage()` для полной информации
+                $loginForm->addError('username', $e->getMessage());
+                return $this->render('apiError', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+            // ...
+            $loginForm->password = '';
+            return $this->goBack();
+        } else {
+            return $this->render('login', [
+                'model' => $loginForm,
+            ]);
+        }
+    }
+
+
+
+
+
+
+
+    /**
+     * Logs in a user.
+     *
+     * @return mixed
+     */
+    public function actionLogin___()
     {
         if (!Yii::$app->user->isGuest) {
             return $this->goHome();

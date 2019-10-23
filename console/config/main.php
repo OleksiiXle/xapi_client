@@ -30,6 +30,12 @@ return [
                 ],
             ],
         ],
+        'authManager' => [
+            //'class' => 'app\modules\adminx\components\DbManager', // or use 'yii\rbac\DbManager'
+            'class' => 'yii\rbac\DbManager', // or use 'yii\rbac\DbManager'
+            'cache' => 'cache' //Включаем кеширование
+        ],
+
     ],
     'params' => $params,
 ];

@@ -1,0 +1,207 @@
+<?php
+
+namespace frontend\components;
+
+use common\models\User;
+use common\models\UserToken;
+use yii\authclient\OAuth2;
+use yii\authclient\InvalidResponseException;
+use yii\authclient\OAuthToken;
+use yii\web\HttpException;
+use yii\web\NotFoundHttpException;
+
+class XapiAuthClient extends OAuth2
+{
+    public $errorMessage = '';
+
+    /**
+     * Restores access token.
+     * @return OAuthToken auth token.
+     */
+    protected function restoreAccessToken()
+    {
+        $token = $this->getState('token');
+        if (!is_object($token)){
+            $token = $this->RestoreTokenFromDb();
+        }
+        if (is_object($token)) {
+            /* @var $token OAuthToken */
+            if ($token->getIsExpired() && $this->autoRefreshAccessToken) {
+                $token = $this->refreshAccessToken($token);
+            }
+        } else {
+            throw new \Exception($this->errorMessage);
+        }
+        return $token;
+    }
+
+
+    public function fetchAccessTokenXle($authCode, array $params = [], User $user)
+    {
+        if ($this->validateAuthState) {
+            $authState = $this->getState('authState');
+            if (!isset($_REQUEST['state']) || empty($authState) || strcmp($_REQUEST['state'], $authState) !== 0) {
+                throw new HttpException(400, 'Invalid auth state parameter.');
+            } else {
+                $this->removeState('authState');
+            }
+        }
+
+        $defaultParams = [
+            'code' => $authCode,
+            'grant_type' => 'authorization_code',
+            'redirect_uri' => $this->getReturnUrl(),
+        ];
+
+        $request = $this->createRequest()
+            ->setMethod('POST')
+            ->setUrl($this->tokenUrl)
+            ->setData(array_merge($defaultParams, $params));
+
+        $this->applyClientCredentialsToRequest($request);
+
+        $response = $this->sendRequest($request);
+
+        $token = $this->createToken(['params' => $response]);
+        $this->setAccessToken($token);
+
+        $ret = $this->storeTokenToDb($token, $user);
+        if (!$ret){
+            $user->addErrors($this->errorMessage);
+        }
+        return $ret;
+/*
+        $r=1;
+        $userProfile = $this->api('/user/userinfo', 'POST', ['id' => $user->id] );
+        $tokenParams = [
+          'tokenParamKey' =>  $token->tokenParamKey,
+          'tokenSecretParamKey' =>  $token->tokenSecretParamKey,
+          'created_at' =>  $token->createTimestamp,
+          'expireDurationParamKey' =>  $token->expireDurationParamKey,
+          'access_token' =>  $token->getParam('access_token'),
+          'expires_in' =>  $token->getParam('expires_in'),
+          'token_type' =>  $token->getParam('token_type'),
+          'scope' =>  $token->getParam('scope'),
+          'refresh_token' =>  $token->getParam('refresh_token'),
+            ];
+*/
+        /*
+        $r = $this->removeState('token');
+        $token_ = $this->getState('token');
+        $this->setAccessToken($token);
+        $token_ = $this->getState('token');
+        */
+
+
+       // return $user->refreshToken($this->getStateKeyPrefix() . '_token', $tokenParams, $userProfile );
+
+    }
+
+    /**
+     * Gets new auth token to replace expired one.
+     * @param OAuthToken $token expired auth token.
+     * @return OAuthToken new auth token.
+     */
+    public function refreshAccessToken(OAuthToken $token)
+    {
+        $i=1;
+        $params = [
+            'grant_type' => 'refresh_token',
+            'refresh_token' => $token->getParam('refresh_token'),
+            'scope' =>  $token->getParam('scope'),
+         //   'redirect_uri' => $this->getReturnUrl(),
+        ];
+        $request = $this->createRequest()
+            ->setMethod('POST')
+            ->setUrl($this->tokenUrl)
+            ->setData($params);
+
+        $this->applyClientCredentialsToRequest($request);
+
+        $response = $this->sendRequest($request);
+        $token = $this->createToken(['params' => $response]);
+        $this->setAccessToken($token);
+
+        if (!$this->storeTokenToDb($token, false, false)){
+            throw new \Exception($this->errorMessage);
+        }
+        return $token;
+    }
+
+    /**
+     * Запись в БД токена клиента
+     * @param OAuthToken $token
+     * @param $client
+     * @param $profile - обновлять профиль или нет
+     * @return bool
+     */
+    public function storeTokenToDb(OAuthToken $token, $client, $profile = true)
+    {
+        try{
+            if (!$client ){
+                $clientId = \Yii::$app->user->id;
+                $client = User::findOne($clientId);
+                if (!isset($client)){
+                    throw new NotFoundHttpException("Client $clientId not found");
+                }
+            }
+
+            $userProfile = ($profile) ? $this->api('/user/userinfo', 'POST', ['id' => $client->id] ) : [];
+            $tokenParams = [
+                'tokenParamKey' =>  $token->tokenParamKey,
+                'tokenSecretParamKey' =>  $token->tokenSecretParamKey,
+                'created_at' =>  $token->createTimestamp,
+                'expireDurationParamKey' =>  $token->expireDurationParamKey,
+                'access_token' =>  $token->getParam('access_token'),
+                'expires_in' =>  $token->getParam('expires_in'),
+                'token_type' =>  $token->getParam('token_type'),
+                'scope' =>  $token->getParam('scope'),
+                'refresh_token' =>  $token->getParam('refresh_token'),
+            ];
+            $ret = $client->refreshToken($this->getStateKeyPrefix() . '_token', $tokenParams, $userProfile );
+            if (!$ret){
+                $this->errorMessage = $client->getErrors();
+                return false;
+            } else{
+                return true;
+            }
+
+        } catch (\Exception $e){
+            $this->errorMessage = $e->getMessage();
+            return false;
+        }
+    }
+
+    /**
+     * Извлечение токена из БД
+     * @return bool
+     */
+    public function RestoreTokenFromDb()
+    {
+        $token = false;//1571731601
+        try{
+            $clientId = \Yii::$app->user->id;
+            $provider = $this->getStateKeyPrefix() . '_token';
+            $dbToken = UserToken::findOne(['client_id' => $clientId, 'provider' => $provider]);
+            if (empty($dbToken)){
+                $this->errorMessage = 'Token not found in DB ' . $clientId . '-' . $this->getStateKeyPrefix() . '_token';
+                return false;
+
+            }
+            $token = $this->createToken(['params' => $dbToken->getAttributes()]);
+            $token = $this->refreshAccessToken($token);
+          //  $this->setAccessToken($token);
+        } catch (\Exception $e){
+            $this->errorMessage = $e->getMessage();
+        }
+        return $token;
+    }
+
+
+
+
+    protected function initUserAttributes()
+    {
+        return $this->api('userinfo', 'GET');
+    }
+}

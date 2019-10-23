@@ -1,0 +1,11 @@
+composer create-project --prefer-dist yiisoft/yii2-app-advanced ./
+
+ Создать БД и прописать в main-local.php
+ php yii migrate
+ Инициализировать таблицы RBAC
+     php yii migrate --migrationPath=@yii/rbac/migrations
+ php yii init/menu-init
+ php yii init/auth-init
+ php yii init/user-init
+ or
+ php yii init/init
