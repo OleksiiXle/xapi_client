@@ -164,6 +164,7 @@ class XapiV1Client extends Component {
             'maxRedirects' => 0,
         ]);
 
+
         if ($data) {
             $this->request->setData($data);
         }
