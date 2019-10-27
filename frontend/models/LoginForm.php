@@ -154,14 +154,7 @@ class LoginForm extends Model
                                     Yii::$app->session->setFlash('error', $e->getMessage()); //todo *********
                                     return false;
                                 }
-
-
-
                                 if ($token){
-                                    //todo синхронизация профиля юсера
-
-
-
                                     Yii::$app->session->setFlash('error', 'Подключено к АПИ ' . $this->provider);
                                     return Yii::$app->user->login($this->user, $this->rememberMe ? 3600 * 24 * 30 : 0);
                                 } else {

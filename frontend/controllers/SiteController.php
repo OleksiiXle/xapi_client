@@ -1,7 +1,11 @@
 <?php
 namespace frontend\controllers;
 
+use common\models\UserToken;
 use frontend\models\Auth;
+use frontend\models\LoginForm;
+
+use frontend\models\LogoutForm;
 use frontend\models\ResendVerificationEmailForm;
 use frontend\models\VerifyEmailForm;
 use Yii;
@@ -11,7 +15,6 @@ use yii\web\BadRequestHttpException;
 use yii\web\Controller;
 use yii\filters\VerbFilter;
 use yii\filters\AccessControl;
-use common\models\LoginForm;
 use frontend\models\PasswordResetRequestForm;
 use frontend\models\ResetPasswordForm;
 use frontend\models\SignupForm;
@@ -159,7 +162,7 @@ class SiteController extends Controller
             return $this->goHome();
         }
 
-        $model = new \frontend\models\LoginForm();
+        $model = new LoginForm();
         if ($model->load(Yii::$app->request->post()) && $model->clientLogin()) {
             return $this->goBack();
         } else {
@@ -169,101 +172,23 @@ class SiteController extends Controller
                 'model' => $model,
             ]);
         }
+    }
 
-
-        $loginForm = new \frontend\models\LoginForm();
-
-        if ($loginForm->load(Yii::$app->request->post()) && $loginForm->validate()) {
-            /* @var $client \yii\authclient\OAuth2 */
-            $client = Yii::$app->authClientCollection->getClient('xapi');
-
-            try {
-                $url = $client->buildAuthUrl();
-                $httpClient = new Client();
-                $request = $httpClient->createRequest()
-                    ->setMethod('GET')
-                    ->setOptions([
-                        'maxRedirects' => 0,
-                    ])
-                    ->setUrl($client->buildAuthUrl());
-                $response = $request->send();
-
-                if (200 == $response->headers['http-code']){
-                    $document = \phpQuery::newDocumentHTML($response->content);
-                  //  $action = $document->find('#login-form')->attr('action');
-                  //  $action = str_replace('/oauth2/index?expand=email', $action, $client->authUrl);
-                    $_csrf = $document->find('input[type=hidden]')->attr('value');
-                    $cookies = $response->cookies;
-                    foreach ($cookies as $key => $cookie) {
-                        $cookies[$key]->value = urlencode($cookies[$key]->value);
-                    }
-                    $loginRequest = $httpClient->createRequest()
-                        ->setMethod('POST')
-                        ->setCookies($cookies)
-                        ->setOptions([
-                            'maxRedirects' => 0,
-                        ])
-                        ->setData([
-                            '_csrf-frontend' => $_csrf,
-                            'LoginForm' => [
-                                'username' => $loginForm->username,
-                                'password' => $loginForm->password,
-                            ]
-                        ])
-                        ->setUrl($client->buildAuthUrl())
-                        ->send();
-
-                    if (200 == $loginRequest->headers['http-code'] || 302 == $loginRequest->headers['http-code']) {
-                        if (isset($loginRequest->headers['location'])) {
-
-                            $location = parse_url($loginRequest->headers['location']);
-                            $params = [];
-                            parse_str($location['query'], $params);
-
-                            // get user data and connect it if need
-                            $_REQUEST['state'] = $params['state'];
-                            $_GET['state'] = $params['state'];
-                            $code = $params['code'];
-                            $token = $client->fetchAccessToken($code);
-                            $t=Yii::$app->authClientCollection;
-                            $r=1;
-
-
-
-
-                        } else {
-                            $loginForm->addError('username', 'Неверная комбинация email и пароля!');
-                            return $this->render('login', [
-                                'model' => $loginForm,
-                            ]);
-                        }
-                    }
-                }
-
-
-
-               // Yii::$app->getResponse()->redirect($url);
-             //   $code = $_GET['code'];
-            //    $accessToken = $client->fetchAccessToken($code);
-
-
-                // аутентификация напрямую через имя пользователя и пароль:
-              //  $accessToken = $client->authenticateUser($loginForm->username, $loginForm->password);
-            } catch (\Exception $e) {
-                // аутентификация завершилась неудачей, используйте `$e->getMessage()` для полной информации
-                $loginForm->addError('username', $e->getMessage());
-                return $this->render('apiError', [
-                    'error' => $e->getMessage(),
-                ]);
-            }
-            // ...
-            $loginForm->password = '';
-            return $this->goBack();
-        } else {
-            return $this->render('login', [
-                'model' => $loginForm,
-            ]);
+    public function actionLogoutFromApi()
+    {
+        if (Yii::$app->user->isGuest) {
+            return $this->goHome();
         }
+
+        $model = new LogoutForm();
+        if ($model->load(Yii::$app->request->post())) {
+            if ($model->providersLogout()){
+                return $this->goHome();
+            }
+        }
+        return $this->render('logout', [
+            'model' => $model,
+        ]);
     }
 
 

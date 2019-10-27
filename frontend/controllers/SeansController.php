@@ -57,26 +57,18 @@ class SeansController extends Controller
         $t=1;
         if (!\Yii::$app->request->isPost){
             $response = $this->getXapi()->callMethod('/sale', []);
-            /*
-            $client = new Client();
-            $response = $client->createRequest()
-                ->setMethod('GET')
-                ->setUrl('http://api.server/v1/sale')
-                ->addHeaders(['Authorization' => 'Bearer FFFF70it7tzNsHddEiq0BZ0i-OU8S3xV'])
-                // ->setData(['name' => 'John Doe', 'email' => 'johndoe@example.com'])
-                ->send();
-            */
-            return $this->render('debug' , ['response' => $response] );
+      //      return $this->render('debug' , ['response' => $response] );
+            if ($response['status']){
+                return $this->render('seansesList',[
+                    'seansesList' => $response['data'],
+                    'response' => $response,
+                ]);
+            } else {
+              //  $session = Yii::$app->session;
+             //   $session->setFlash('error', $response['data']);
+                return $this->goBack();
 
-            $seansesList = $response->isOk ? $response->data : [];
-            $result['data'] = $response->data;
-            $result['code'] = $response->headers['http-code'];
-            $result['headers'] = $response->headers;
-            return $this->render('seansesList',[
-                'seansesList' => $seansesList,
-                'response' => $response,
-                'result' => $result,
-            ]);
+            }
         } else {
             $_post = \Yii::$app->request->post();
             if (isset($_post['seansId'])){
@@ -93,7 +85,20 @@ class SeansController extends Controller
     {
         $t=1;
         if (!\Yii::$app->request->isPost){
-            $client = new Client();
+          //  $client = new Client();
+            $response = $this->getXapi()->callMethod('/sale/get-seans', ['id' => $seansId]);
+            //      return $this->render('debug' , ['response' => $response] );
+            if ($response['status']){
+                return $this->render('seans',[
+                    'seans' => $response['data'],
+                ]);
+            } else {
+             //   $session = Yii::$app->session;
+             //   $session->setFlash('error', $response['data']);
+                return $this->goBack();
+
+            }
+
             $response = $client->createRequest()
                 ->setMethod('GET')
                 ->setUrl('http://api.server/v1/sale/get-seans')

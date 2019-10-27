@@ -4,6 +4,7 @@ namespace frontend\components;
 
 use common\models\User;
 use common\models\UserToken;
+use TheSeer\Tokenizer\Exception;
 use yii\authclient\OAuth2;
 use yii\authclient\InvalidResponseException;
 use yii\authclient\OAuthToken;
@@ -13,6 +14,17 @@ use yii\web\NotFoundHttpException;
 class XapiAuthClient extends OAuth2
 {
     public $errorMessage = '';
+    private $_fullClientId;
+
+    /**
+     * @return mixed
+     */
+    public function getFullClientId()
+    {
+        $this->_fullClientId = $this->getStateKeyPrefix() . '_token';
+        return $this->_fullClientId;
+    }
+
 
     /**
      * Restores access token.
@@ -30,7 +42,9 @@ class XapiAuthClient extends OAuth2
                 $token = $this->refreshAccessToken($token);
             }
         } else {
-            throw new \Exception($this->errorMessage);
+            $token = $this->refreshAccessToken($token);
+           // return false;
+          //  throw new \Exception($this->errorMessage);
         }
         return $token;
     }
@@ -137,6 +151,10 @@ class XapiAuthClient extends OAuth2
      */
     public function storeTokenToDb(OAuthToken $token, $client, $profile = true)
     {
+        if (\Yii::$app->user->isGuest){
+            return true;
+        }
+
         try{
             if (!$client ){
                 $clientId = \Yii::$app->user->id;
@@ -179,12 +197,15 @@ class XapiAuthClient extends OAuth2
     public function RestoreTokenFromDb()
     {
         $token = false;//1571731601
+        if (\Yii::$app->user->isGuest){
+            return false;
+        }
         try{
             $clientId = \Yii::$app->user->id;
             $provider = $this->getStateKeyPrefix() . '_token';
             $dbToken = UserToken::findOne(['client_id' => $clientId, 'provider' => $provider]);
             if (empty($dbToken)){
-                $this->errorMessage = 'Token not found in DB ' . $clientId . '-' . $this->getStateKeyPrefix() . '_token';
+                $this->errorMessage = "Token '$this->clientId' not found in DB for user= $clientId";
                 return false;
 
             }
@@ -196,6 +217,36 @@ class XapiAuthClient extends OAuth2
         }
         return $token;
     }
+
+    /**
+     * Удаление на АПИ всех токенов юсера по провайдеру
+     */
+    public function removeTokens($userApi_id)
+    {
+        $i=1;
+        try{
+            $params = [
+                'grant_type' => 'logout',
+                'user_id' => $userApi_id,
+            ];
+            $request = $this->createRequest()
+                ->setMethod('POST')
+                ->setUrl($this->tokenUrl)
+                ->setData($params);
+
+            $this->applyClientCredentialsToRequest($request);
+            $response = $this->sendRequest($request);
+
+            $this->removeState($this->getStateKeyPrefix() . '_token');
+
+            $dbTokenDel = UserToken::deleteAll(['api_id' => $userApi_id, 'provider' => $this->fullClientId]);
+            return true;
+        } catch (Exception $e){
+            $this->errorMessage = $e->getMessage();
+            return false;
+        }
+    }
+
 
 
 

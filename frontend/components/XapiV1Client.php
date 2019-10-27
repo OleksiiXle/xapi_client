@@ -159,37 +159,46 @@ class XapiV1Client extends Component {
         $token            = $XapiAuthClient->getAccessToken();
         if ($token) {
             $this->request->setHeaders(['Authorization' => 'Bearer ' . $token->params['access_token']]);
-        }
-        $this->request->setOptions([
-            'maxRedirects' => 0,
-        ]);
+            $this->request->setOptions([
+                'maxRedirects' => 0,
+            ]);
 
 
-        if ($data) {
-            $this->request->setData($data);
-        }
-        $this->response = $this->request->send();
+            if ($data) {
+                $this->request->setData($data);
+            }
+            $this->response = $this->request->send();
 
-        $this->handleResult();
-        try {
-            if (($this->responseStatus === 0) || ($this->responseStatus == self::RETURN_AUTH_ERROR)) {
+            $this->handleResult();
+            try {
+                if (($this->responseStatus === 0) || ($this->responseStatus == self::RETURN_AUTH_ERROR)) {
+                    exit(\yii::$app->runAction($this->authRedirect));
+                }
+            } catch (\Exception $ex) {
                 exit(\yii::$app->runAction($this->authRedirect));
             }
-        } catch (\Exception $ex) {
-            exit(\yii::$app->runAction($this->authRedirect));
-        }
 
-        if ($this->ajaxResponse) {
-            $this->jHeaders();
-            //\yii::trace(\yii\helpers\VarDumper::dumpAsString(\yii::$app->response->headers), "upzapi");
-            return $this->ajaxResult;
+            if ($this->ajaxResponse) {
+                $this->jHeaders();
+                //\yii::trace(\yii\helpers\VarDumper::dumpAsString(\yii::$app->response->headers), "upzapi");
+                return $this->ajaxResult;
+            } else {
+                return [
+                    'status'       => $this->response->isOk,
+                    'data'         => $this->response->data,
+                    'headers'      => $this->response->headers,
+                    'returnStatus' => $this->responseStatus,
+                ];
+            }
+
         } else {
             return [
-                'status'       => $this->response->isOk,
-                'data'         => $this->response->data,
-                'headers'      => $this->response->headers,
-                'returnStatus' => $this->responseStatus,
+                'status'       => false,
+                'data'         => $XapiAuthClient->errorMessage,
+                'headers'      => [],
+                'returnStatus' => '',
             ];
+
         }
     }
 
@@ -199,8 +208,173 @@ class XapiV1Client extends Component {
      *
      * @return integer
      */
-    protected function handleResult() {
-        $this->ajaxResult = $this->response->data;
+    protected function handleResult()
+    {
++        $isOk = $this->response->isOk;
+        $httpCode = (int) $this->response->headers->get("http-code");
+     //   $this->ajaxResult = $this->response->data;
+        /** Nonsens answer, e.g. Yii2 log  */
+        if ($this->isNonsens()) {
+            $this->log();
+            $this->isNoSucces();
+            if ($this->nonsensCallback && ($this->nonsensCallback instanceof \Closure)) {
+                $this->ajaxResult = call_user_func_array($this->nonsensCallback,
+                    [$this->response->headers]);
+            }
+            if ($this->nonsensMessage) {
+                $this->setMessage($this->nonsensMessageType,
+                    $this->nonsensMessage);
+            } else {
+                if ($this->useDefNonsensMessage) {
+                    $this->setMessage($this->nonsensMessageType,
+                        "{$this->defName}. {$this->defMessage}");
+                }
+            }
+            if ($this->nonsensRedirect) {
+                \yii::$app->getResponse()->redirect($this->nonsensRedirect)->send();
+                \yii::$app->end();
+            }
+            return $this->responseStatus;
+        }
+        /** No authorization */
+        if ($this->isAuthErr()) {
+            $this->log();
+            $this->isNoSucces();
+            if ($this->authCallback) {
+                $this->ajaxResult = call_user_func_array($this->authCallback,
+                    [$this->response->data, $this->response->headers]);
+            }
+            if ($this->authMessage) {
+                $this->setMessage($this->authMessageType, $this->authMessage);
+            } else {
+                if ($this->useDefAuthMessage) {
+                    $this->setMessage($this->authMessageType,
+                        "{$this->defName}. {$this->defMessage}");
+                }
+            }
+            if ($this->authRedirect) {
+                \yii::$app->getResponse()->redirect($this->authRedirect)->send();
+                \yii::$app->end();
+            }
+            return $this->responseStatus;
+        }
+        /** No authorization permissions */
+        if ($this->isAuthPermsErr()) {
+            $this->log();
+            $this->isNoSucces();
+            if ($this->permsCallback && ($this->permsCallback instanceof \Closure)) {
+                $this->ajaxResult = call_user_func_array($this->permsCallback,
+                    [$this->response->data, $this->response->headers]);
+            }
+            if ($this->permsMessage) {
+                $this->setMessage($this->permsMessageType, $this->permsMessage);
+            } else {
+                if ($this->useDefPermsMessage) {
+                    $this->setMessage($this->permsMessageType,
+                        "{$this->defName}. {$this->defMessage}");
+                }
+            }
+            if ($this->permsRedirect) {
+                \yii::$app->getResponse()->redirect($this->permsRedirect)->send();
+                \yii::$app->end();
+            }
+            return $this->responseStatus;
+        }
+        /** API exceptions */
+        if ($this->isException()) {
+            $this->log();
+            $this->isNoSucces();
+            if ($this->exceptionMessage) {
+                //\yii::trace(\yii\helpers\VarDumper::dumpAsString([$this->exceptionMessageType, $this->exceptionMessage]),
+                //        "upzapi");
+                $this->setMessage($this->exceptionMessageType,
+                    $this->exceptionMessage);
+            } else {
+                if ($this->useDefExceptMessage) {
+                    $this->setMessage($this->exceptionMessageType,
+                        "{$this->defName}. {$this->defMessage}");
+                }
+            }
+            if ($this->exceptionCallback && ($this->exceptionCallback instanceof \Closure)) {
+                $this->ajaxResult = call_user_func_array($this->exceptionCallback,
+                    [$this->response->data, $this->response->headers]);
+            }
+            if ($this->exceptionRedirect) {
+                \yii::$app->getResponse()->redirect($this->exceptionRedirect)->send();
+                \yii::$app->end();
+            }
+            /* @todo Сделать коды ошибочных ответов апи в клиента */
+            //\yii::$app->response->setStatusCode(400);
+            return $this->responseStatus;
+        }
+        /** Answer as validation errors */
+        if ($this->isValidErr()) {
+            $this->log();
+            try {
+                $errors = [];
+                if (count($this->response->data) && (!is_null($this->model) && ($this->model instanceof \yii\base\Model))) {
+                    foreach ($this->response->data as $error) {
+                        $this->model->addError($error["field"],
+                            $error["message"]);
+                        $errors[] = "{$error["field"]}: {$error["message"]}";
+                    }
+                }
+                if ($this->invalidMessage) {
+                    $this->setMessage($this->invalidMessageType,
+                        $this->invalidMessage);
+                } else {
+                    $this->setMessage($this->invalidMessageType,
+                        implode("\n", $errors));
+                }
+                if ($this->invalidCallback && ($this->invalidCallback instanceof \Closure)) {
+                    $this->ajaxResult = call_user_func_array($this->invalidCallback,
+                        [$this->response->data, $this->response->headers]);
+                }
+                if ($this->invalidRedirect) {
+                    \yii::$app->getResponse()->redirect($this->invalidRedirect)->send();
+                    \yii::$app->end();
+                }
+            } catch (Exception $ex) {
+
+            }
+            return $this->responseStatus;
+        }
+        /** Success answer */
+        if ($this->isSuccess()) {
+            try {
+                if ($this->model instanceof \yii\base\Model) {
+                    $this->model->setAttributes($this->response->data, true);
+                }
+            } catch (Exception $ex) {
+                \yii::error(VarDumper::dumpAsString($ex), "upzapi");
+            }
+            if ($this->successCallback && ($this->successCallback instanceof \Closure)) {
+                $this->ajaxResult = call_user_func_array($this->successCallback,
+                    [$this->response->data, $this->response->headers, $this]);
+            }
+            if ($this->successMessage) {
+                $this->setMessage($this->successMessageType,
+                    $this->successMessage);
+            }
+            if ($this->successRedirect) {
+                \yii::$app->getResponse()->redirect($this->successRedirect)->send();
+                \yii::$app->end();
+            }
+            return $this->responseStatus;
+        }
+    }
+
+    protected function handleResultOLD()
+    {
+        $isOk = $this->response->isOk;
+        $httpCode = (int) $this->response->headers->get("http-code");
+        switch ($httpCode){
+            case 200:
+                break;
+            case 404:
+                break;
+        }
+     //   $this->ajaxResult = $this->response->data;
         /** Nonsens answer, e.g. Yii2 log  */
         if ($this->isNonsens()) {
             $this->log();
@@ -358,7 +532,6 @@ class XapiV1Client extends Component {
         }
     }
 
-
     /**
      * @param string $method
      * @param string $url
@@ -490,8 +663,8 @@ class XapiV1Client extends Component {
             (int) $this->response->headers->get("http-code") == 403;
         if ($ret) {
             $this->responseStatus = self::RETURN_PERMS_ERROR;
-            $this->defName        = \yii::t("common", "Права доступа");
-            $this->defMessage     = \yii::t("common",
+            $this->defName        = \yii::t("app", "Права доступа");
+            $this->defMessage     = \yii::t("app",
                 "Вы не можете выполнять это действие");
         }
         return $ret;
@@ -503,8 +676,8 @@ class XapiV1Client extends Component {
             (int) $this->response->headers->get("http-code") >= 400;
         if ($ret) {
             $this->response->data = [];
-            $this->defName        = \yii::t("common", "Ошибка сервера");
-            $this->defMessage     = \yii::t("common",
+            $this->defName        = \yii::t("app", "Ошибка сервера");
+            $this->defMessage     = \yii::t("app",
                 "Обратитесь к администратору");
             $this->responseStatus = self::RETURN_NONSENS;
         }
