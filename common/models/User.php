@@ -72,6 +72,19 @@ class User extends ActiveRecord implements IdentityInterface
         return $this->_user;
     }
 
+    public function getApiPermissions($provider)
+    {
+        $apiPermissions = [];
+        $user = $this->user;
+        if ($user){
+            $userToken = UserToken::findOne(['client_id' => $user->id, 'provider' => $provider]);
+            if ($userToken){
+                $apiPermissions =  $userToken->userPermissions;
+            }
+        }
+        return $apiPermissions;
+    }
+
 //********************************************************************************* IDENTITY INTERFACE
 
     /**
@@ -277,6 +290,9 @@ class User extends ActiveRecord implements IdentityInterface
             $token->provider = $provider;
         }
         $token->setAttributes($tokenParams);
+        if (!empty($userProfile['permissions'])){
+            $token->userPermissions = $userProfile['permissions'];
+        }
      //   $data = $token->getAttributes();
         if (!$token->save()){
             throw new \Exception($token->showErrors());

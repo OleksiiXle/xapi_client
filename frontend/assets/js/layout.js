@@ -173,10 +173,13 @@ function displayFlashMessage(msg) {
 
 function checkFlashMessages() {
     if (typeof(_fms) != 'undefined' ){
-     //   console.log(_fms);
+          console.log(_fms);
         var typeMess = '';
         var messageTxt = '';
         $.each(_fms, function (type, message) {
+            // 'success', 'info', 'warning', 'danger'
+            typeMess = 'class = "alert alert-' + type + '"';
+            /*
             switch (type) {
                 case 'success':
                     typeMess = 'class = "alert-success"';
@@ -185,6 +188,7 @@ function checkFlashMessages() {
                     typeMess = 'class = "alert-danger"';
                     break;
             }
+            */
             if (typeof(message) == 'object'){
                 $.each(message, function (index, txt){
                     messageTxt += '<div ' + typeMess + '>' + txt +'</div>';
@@ -195,6 +199,10 @@ function checkFlashMessages() {
         });
         $("#flashMessage").html(messageTxt);
         $("#flashMessage").show();
+        setTimeout(function() {
+            $("#flashMessage").hide();
+        }, 5000);
+
 
     }
 }

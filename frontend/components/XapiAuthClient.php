@@ -81,7 +81,7 @@ class XapiAuthClient extends OAuth2
 
         $ret = $this->storeTokenToDb($token, $user);
         if (!$ret){
-            $user->addErrors($this->errorMessage);
+            $user->addError('username', $this->errorMessage);
         }
         return $ret;
 /*
@@ -151,9 +151,10 @@ class XapiAuthClient extends OAuth2
      */
     public function storeTokenToDb(OAuthToken $token, $client, $profile = true)
     {
-        if (\Yii::$app->user->isGuest){
-            return true;
-        }
+      //  if (\Yii::$app->user->isGuest){
+     //       return true;
+     //   }
+        $t=1;
 
         try{
             if (!$client ){

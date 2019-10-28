@@ -1,8 +1,8 @@
 <?php
 
-namespace backend\modules\adminx\components;
+namespace common\components\access;
 
-use backend\modules\adminx\models\User;
+use common\models\User;
 use Yii;
 use yii\db\Query;
 use yii\rbac\Assignment;
@@ -202,6 +202,13 @@ class DbManager extends BaseManager
                     : '';
             }
            // $this->getPermissionChildrenRecursive($userSelfPermission->name, $this->_userRolesPermissions);
+        }
+
+        if (Yii::$app->configs->apiProvider){
+            $apiPermissions = Yii::$app->user->identity->getApiPermissions(Yii::$app->configs->apiProvider);
+            if (!empty($apiPermissions)){
+                $this->_userRolesPermissions = array_merge($this->_userRolesPermissions, $apiPermissions);
+            }
         }
 
     }

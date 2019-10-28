@@ -16,6 +16,7 @@ class ConfigsComponent extends Component
     private $_passwordResetTokenExpire = 3600;  //const PASSWORD_RESET_TOKEN_EXPIRE = 3600;
     private $_userDefaultRole = 'user';     //const DEFAULT_ROLE = 'user';
     private $_rbacCacheSource = 'session';//'cache';
+    public $apiProvider = false;
 
 
     /*

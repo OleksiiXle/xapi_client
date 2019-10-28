@@ -45,12 +45,12 @@ return [
             'apiBaseUrl' => $params['apiBaseUrl'],
         ],
         'authManager' => [
-            'class' => 'backend\modules\adminx\components\DbManager',
+            'class' => 'common\components\access\DbManager',
             'cache' => 'cache'
         ],
         'user' => [
             'class' => 'frontend\components\UserX',
-            'identityClass' => 'frontend\models\User',
+            'identityClass' => 'common\models\User',
             'loginUrl' => ['site/login'],
             'enableAutoLogin' => true,
             'identityCookie' => ['name' => '_identity-frontend', 'httpOnly' => true],

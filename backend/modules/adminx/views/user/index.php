@@ -5,9 +5,8 @@ use yii\widgets\Pjax;
 use yii\helpers\Url;
 use common\components\widgets\xlegrid\Xlegrid;
 use common\components\widgets\menuAction\MenuActionWidget;
-use backend\modules\adminx\models\UserM;
+use common\models\UserM;
 use backend\modules\adminx\assets\AdminxUserAsset;
-use common\models\Functions;
 
 AdminxUserAsset::register($this);
 
@@ -117,14 +116,6 @@ $this->title =  'Користувачі';
                                         'onclick' => 'changeUserActivity("' . $data->id . '");',
                                         'id' => 'activityIcon_' . $data->id,
                                     ]);
-                            },
-                        ],
-                        [
-                            'headerOptions' => ['style' => 'width: 6%;overflow: hidden; '],
-                            'contentOptions' => ['style' => 'width: 6%; white-space: nowrap; overflow: hidden;'],
-                            'label'=>'Token',
-                            'content'=>function($data){
-                                return $data->tokenExpireTime;
                             },
                         ],
                         [

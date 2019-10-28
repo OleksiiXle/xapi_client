@@ -28,14 +28,14 @@ return [
             'csrfParam' => '_csrf-backend',
         ],
         'user' => [
-            'class' => 'backend\modules\adminx\components\User',
+            'class' => 'common\components\access\User',
             'identityClass' => 'common\models\User',
             'loginUrl' => ['site/login'],
             'enableAutoLogin' => true,
             'identityCookie' => ['name' => '_identity-backend', 'httpOnly' => true],
         ],
         'authManager' => [
-            'class' => 'backend\modules\adminx\components\DbManager',
+            'class' => 'common\components\access\DbManager',
             'cache' => 'cache'
         ],
         'session' => [

@@ -74,6 +74,7 @@ $this->registerLinkTag(['rel' => 'icon', 'type' => 'image/png', 'href' => \yii\h
     </div>
     <div class="xLayoutContent">
         <?php
+        /*
         foreach (Yii::$app->session->getAllFlashes() as $key => $message) {
             if(Yii::$app->getSession()->hasFlash($key)){
                 echo Alert::widget([
@@ -85,7 +86,11 @@ $this->registerLinkTag(['rel' => 'icon', 'type' => 'image/png', 'href' => \yii\h
             }
 
 
-        }        ?>
+        }
+        */
+        ?>
+        <div id="flashMessage" class="alert" style="display: none">
+        </div>
 
         <?= $content ?>
         <div class="xFooter">

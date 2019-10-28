@@ -26,15 +26,7 @@ class UserToken extends MainModel
 {
     private $_expireTime;
 
-    /**
-     * @return mixed
-     */
-    public function getExpireTime()
-    {
-        $ret = (int) $this->expires_in + $this->created_at;
-        $this->_expireTime = Functions::intToDateTime($ret);
-        return $this->_expireTime;
-    }
+    private $_userPermissions;
 
     /**
      * {@inheritdoc}
@@ -54,6 +46,7 @@ class UserToken extends MainModel
             [['client_id', 'api_id', 'created_at'], 'integer'],
             [['provider'], 'string', 'max' => 50],
             [['tokenParamKey', 'tokenSecretParamKey', 'access_token',  'token_type', 'scope', 'refresh_token'], 'string', 'max' => 255],
+            [['permissions'], 'string', 'max' => 10000],
             [['client_id', 'api_id', 'provider'], 'unique', 'targetAttribute' => ['client_id', 'api_id', 'provider']],
             [['client_id'], 'exist', 'skipOnError' => true, 'targetClass' => User::className(), 'targetAttribute' => ['client_id' => 'id']],
         ];
@@ -75,6 +68,7 @@ class UserToken extends MainModel
             'expires_in' => Yii::t('app', 'Expires In'),
             'token_type' => Yii::t('app', 'Token Type'),
             'scope' => Yii::t('app', 'Scope'),
+            'permissions' => Yii::t('app', 'permissions'),
             'refresh_token' => Yii::t('app', 'Refresh Token'),
             'created_at' => Yii::t('app', 'Created At'),
         ];
@@ -87,4 +81,50 @@ class UserToken extends MainModel
     {
         return $this->hasOne(User::className(), ['id' => 'client_id']);
     }
+
+    /**
+     * @return mixed
+     */
+    public function getUserPermissions()
+    {
+        $this->_userPermissions = [];
+        try{
+            if (!empty($this->permissions) && is_string($this->permissions)){
+                $this->_userPermissions = json_decode($this->permissions, true);
+            }
+
+        } catch (\Exception $e){
+            $this->addError('id', $e->getMessage());
+            $this->_userPermissions = [];
+        }
+        return $this->_userPermissions;
+    }
+
+    /**
+     * @param mixed $userPermissions
+     */
+    public function setUserPermissions($userPermissions)
+    {
+        $this->permissions = '';
+        try{
+            if (!empty($userPermissions) && is_array($userPermissions)){
+                $this->permissions = json_encode($userPermissions);
+            }
+
+        } catch (\Exception $e){
+            $this->addError('id', $e->getMessage());
+            $this->permissions = '';
+        }
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getExpireTime()
+    {
+        $ret = (int) $this->expires_in + $this->created_at;
+        $this->_expireTime = Functions::intToDateTime($ret);
+        return $this->_expireTime;
+    }
+
 }

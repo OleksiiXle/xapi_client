@@ -155,7 +155,8 @@ class LoginForm extends Model
                                     return false;
                                 }
                                 if ($token){
-                                    Yii::$app->session->setFlash('error', 'Подключено к АПИ ' . $this->provider);
+                                    Yii::$app->session->setFlash('success', 'Подключено к АПИ ' . $this->provider);
+                                    Yii::$app->configs->apiProvider = $client->fullClientId;
                                     return Yii::$app->user->login($this->user, $this->rememberMe ? 3600 * 24 * 30 : 0);
                                 } else {
                                     $this->addError('username', 'Ошибка обработки токена'); //todo ********
