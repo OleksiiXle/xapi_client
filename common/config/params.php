@@ -18,6 +18,6 @@ return [
     'defaultRoles' => [
         'superAdmin' => 'superAdmin',
         'user' => 'user',
-    ]
+    ],
 
 ];

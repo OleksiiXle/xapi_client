@@ -35,7 +35,7 @@ class SeansController extends Controller
                 [
                     'allow'      => true,
                     'actions'    => [
-                        'seanses-list',
+                        'seanses-list', 'choise-seats'
                     ],
                     'roles'      => ['systemAdminxx', ],
                 ],
