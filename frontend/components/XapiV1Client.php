@@ -6,10 +6,7 @@ use yii\base\Component;
 use yii\di\Instance;
 use yii\httpclient\Client;
 use yii\httpclient\Request;
-use yii\helpers\Url;
 use yii\helpers\VarDumper;
-use yii\web\Session;
-use dektrium\user\models\Account;
 
 
 class XapiV1Client extends Component {
@@ -210,7 +207,7 @@ class XapiV1Client extends Component {
      */
     protected function handleResult()
     {
-+        $isOk = $this->response->isOk;
+        $isOk = $this->response->isOk;
         $httpCode = (int) $this->response->headers->get("http-code");
      //   $this->ajaxResult = $this->response->data;
         /** Nonsens answer, e.g. Yii2 log  */

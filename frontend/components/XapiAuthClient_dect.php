@@ -8,15 +8,9 @@ use dektrium\user\models\User;
 use dektrium\user\events\AuthEvent;
 use dektrium\user\clients\ClientInterface;
 
-
 class XapiAuthClient extends OAuth2 implements ClientInterface
 {
     public function init() {
-        /*\yii\base\Event::on(
-            \dektrium\user\controllers\SecurityController::className(),
-            \dektrium\user\controllers\SecurityController::EVENT_BEFORE_AUTHENTICATE,
-            [$this, 'connectUser']
-        );*/
     }
 
     /**
